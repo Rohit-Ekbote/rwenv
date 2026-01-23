@@ -36,7 +36,7 @@ Before executing any operations:
    - Container name from `devContainer` field in envs.json
 
 5. **For git operations**: Ensure Flux repo is available
-   - Location: `~/.claude/rwenv/flux-repos/<rwenv-name>/`
+   - Location: `${RWENV_CONFIG_DIR:-~/.claude/rwenv}/flux-repos/<rwenv-name>/`
    - Clone if not present, pull if exists
 
 ## Command Execution Patterns
@@ -54,7 +54,7 @@ docker exec -it <devContainer> flux \
 
 ```bash
 # Flux repo location
-cd ~/.claude/rwenv/flux-repos/<rwenv-name>/
+cd ${RWENV_CONFIG_DIR:-~/.claude/rwenv}/flux-repos/<rwenv-name>/
 
 # Standard git commands
 git pull
@@ -129,7 +129,7 @@ When `readOnly: true` in rwenv config:
 ### Location
 
 ```
-~/.claude/rwenv/flux-repos/
+${RWENV_CONFIG_DIR:-~/.claude/rwenv}/flux-repos/
 ├── dev/           # Cloned repo for 'dev' rwenv
 ├── staging/       # Cloned repo for 'staging' rwenv
 └── prod/          # Cloned repo for 'prod' rwenv
@@ -140,7 +140,7 @@ When `readOnly: true` in rwenv config:
 | Scenario | Action |
 |----------|--------|
 | First access | Clone from `fluxGitRepo` in rwenv config |
-| Subsequent access | `git fetch && git pull` to update |
+| Subsequent access | `git pull` to update |
 | Missing `fluxGitRepo` | Error: "No fluxGitRepo configured for rwenv '<name>'. Add it to envs.json." |
 | Dirty working tree | Warn: "Flux repo has uncommitted changes. Proceed? [y/N]" |
 

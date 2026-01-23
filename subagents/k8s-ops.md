@@ -5,7 +5,6 @@ triggers:
   - kubernetes operations
   - k8s operations
   - pod operations
-  - flux operations
   - restart deployment
   - get logs
   - describe pod
