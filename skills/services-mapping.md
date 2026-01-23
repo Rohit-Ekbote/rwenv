@@ -85,7 +85,12 @@ Guide the user through regenerating the catalog:
 
 The services catalog is at: `<plugin-directory>/data/services-catalog.json`
 
-To find the plugin directory, check where this skill file is located and go up one level.
+To find the plugin directory:
+1. This skill file is located at `<plugin-directory>/skills/services-mapping.md`
+2. Go up one level from `skills/` to get the plugin root
+3. The catalog is at `data/services-catalog.json` relative to plugin root
+
+For programmatic access, check where this skill was loaded from and navigate accordingly.
 
 ## Error Handling
 
@@ -94,3 +99,8 @@ To find the plugin directory, check where this skill file is located and go up o
 | Catalog file missing | "Services catalog not found. Run /services-mapping regenerate to create it." |
 | Catalog JSON invalid | "Services catalog has invalid JSON. Check data/services-catalog.json" |
 | No services in catalog | "Services catalog is empty. Run /services-mapping regenerate to populate it." |
+| rwenv not set (regeneration) | "No rwenv configured. Use /rwenv-set to select an environment before regenerating." |
+| kubectl command fails | "Failed to query cluster. Check rwenv configuration and dev container status." |
+| Flux repo not configured | "No fluxGitRepo configured for this rwenv. Add it to envs.json or skip Flux correlation." |
+| Flux repo clone/pull fails | "Failed to access Flux repo. Check URL and credentials. Proceeding with cluster data only." |
+| No write permission | "Cannot write to data/services-catalog.json. Check file permissions." |
