@@ -324,3 +324,75 @@ EOF
         echo "$services" | jq -r 'to_entries[] | "  \(.key): \(.value)"'
     fi
 }
+
+# Get Flux repo URL for rwenv
+get_flux_repo_url() {
+    local name="$1"
+    local rwenv
+    rwenv="$(get_rwenv_by_name "$name")" || return 1
+
+    echo "$rwenv" | jq -r '.fluxGitRepo // empty'
+}
+
+# Get Flux repo local path for rwenv
+get_flux_repo_path() {
+    local name="$1"
+    local config_dir
+    config_dir="$(get_config_dir)"
+
+    echo "$config_dir/flux-repos/$name"
+}
+
+# Check if Flux repo is cloned for rwenv
+is_flux_repo_cloned() {
+    local name="$1"
+    local repo_path
+    repo_path="$(get_flux_repo_path "$name")"
+
+    [[ -d "$repo_path/.git" ]]
+}
+
+# Clone or update Flux repo for rwenv
+ensure_flux_repo() {
+    local name="$1"
+    local repo_url repo_path
+
+    repo_url="$(get_flux_repo_url "$name")"
+    if [[ -z "$repo_url" ]]; then
+        echo "ERROR: No fluxGitRepo configured for rwenv '$name'" >&2
+        return 1
+    fi
+
+    repo_path="$(get_flux_repo_path "$name")"
+
+    if is_flux_repo_cloned "$name"; then
+        # Update existing repo
+        echo "Updating Flux repo at $repo_path..." >&2
+        (cd "$repo_path" && git fetch origin && git pull --ff-only) || {
+            echo "WARNING: Could not update Flux repo. Working with existing checkout." >&2
+        }
+    else
+        # Clone new repo
+        echo "Cloning Flux repo to $repo_path..." >&2
+        mkdir -p "$(dirname "$repo_path")"
+        git clone "$repo_url" "$repo_path" || {
+            echo "ERROR: Failed to clone Flux repo from $repo_url" >&2
+            return 1
+        }
+    fi
+
+    echo "$repo_path"
+}
+
+# Check if Flux repo has uncommitted changes
+is_flux_repo_dirty() {
+    local name="$1"
+    local repo_path
+    repo_path="$(get_flux_repo_path "$name")"
+
+    if [[ ! -d "$repo_path/.git" ]]; then
+        return 1  # Not cloned, so not dirty
+    fi
+
+    (cd "$repo_path" && [[ -n "$(git status --porcelain)" ]])
+}
