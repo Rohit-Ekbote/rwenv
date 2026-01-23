@@ -5,7 +5,7 @@
 # while allowing main branch operations in rwenv-related repositories.
 #
 # Rules:
-# - Current project (cwd): Block push/commit/merge to main/master
+# - Current project (cwd): Block push/commit/merge to main/master, block tag operations
 # - rwenv repos (not cwd): Allow all git operations including main branch
 
 set -euo pipefail
@@ -171,6 +171,59 @@ Use a pull request to merge changes into $current_branch.
 EOF
             exit 1
         fi
+    fi
+
+    # Check: git tag (block all tag creation in current project)
+    if echo "$cmd" | grep -qE "^git tag(\s|$)" && ! echo "$cmd" | grep -qE "^git tag -l"; then
+        # Allow 'git tag -l' (list tags), block all other tag operations
+        cat >&2 <<EOF
+ERROR: Cannot create or modify tags in current project.
+
+Command: $cmd
+Project: $GIT_ROOT
+
+Tag operations should be performed through CI/CD pipelines or release processes.
+EOF
+        exit 1
+    fi
+
+    # Check: git push --tags or git push with tag references
+    if echo "$cmd" | grep -qE "^git push.*--tags"; then
+        cat >&2 <<EOF
+ERROR: Cannot push tags in current project.
+
+Command: $cmd
+Project: $GIT_ROOT
+
+Tag operations should be performed through CI/CD pipelines or release processes.
+EOF
+        exit 1
+    fi
+
+    # Check: git push --delete (could be deleting tags or branches)
+    if echo "$cmd" | grep -qE "^git push.*--delete"; then
+        cat >&2 <<EOF
+ERROR: Cannot delete remote refs in current project.
+
+Command: $cmd
+Project: $GIT_ROOT
+
+Deletion of remote branches/tags should be performed through the web interface or CI/CD.
+EOF
+        exit 1
+    fi
+
+    # Check: git push origin :refs/tags/ (another way to delete remote tags)
+    if echo "$cmd" | grep -qE "^git push.*:refs/tags/"; then
+        cat >&2 <<EOF
+ERROR: Cannot delete remote tags in current project.
+
+Command: $cmd
+Project: $GIT_ROOT
+
+Tag operations should be performed through CI/CD pipelines or release processes.
+EOF
+        exit 1
     fi
 
     # Check: git checkout main/master (allow, but warn)
