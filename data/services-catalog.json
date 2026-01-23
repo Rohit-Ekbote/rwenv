@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "generatedFrom": {
+    "cluster": "placeholder",
+    "fluxRepo": "placeholder",
+    "generatedAt": "2026-01-24T00:00:00Z"
+  },
+  "services": {
+    "_placeholder": {
+      "description": "Placeholder service - run /services-mapping regenerate to populate from cluster",
+      "namespace": "default",
+      "fluxPath": "clusters/example/apps/placeholder/",
+      "helmRelease": "placeholder",
+      "kustomization": "apps-placeholder"
+    }
+  }
+}
