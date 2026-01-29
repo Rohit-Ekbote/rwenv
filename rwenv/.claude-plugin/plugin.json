@@ -5,8 +5,8 @@
   "author": {
     "name": "Rohit Ekbote"
   },
-  "homepage": "https://github.com/Rohit-Ekbote/rwenv",
-  "repository": "https://github.com/Rohit-Ekbote/rwenv",
+  "homepage": "https://github.com/Rohit-Ekbote/claude-plugins",
+  "repository": "https://github.com/Rohit-Ekbote/claude-plugins",
   "license": "MIT",
   "keywords": ["kubernetes", "k8s", "gke", "k3s", "multi-cluster", "environment", "safety"]
 }

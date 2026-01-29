@@ -14,8 +14,8 @@ A Claude Code plugin for managing Kubernetes environments. Enables safe interact
 Clone the repository and install as a local plugin:
 
 ```bash
-git clone https://github.com/Rohit-Ekbote/rwenv.git ~/.claude/plugins/rwenv
-claude plugins install ~/.claude/plugins/rwenv
+git clone https://github.com/Rohit-Ekbote/claude-plugins.git ~/.claude/plugins/claude-plugins
+claude plugins install ~/.claude/plugins/claude-plugins/rwenv
 ```
 
 ## Configuration
@@ -24,7 +24,7 @@ Create the configuration directory and add your environments:
 
 ```bash
 mkdir -p ~/.claude/rwenv
-cp ~/.claude/plugins/rwenv/config/envs.example.json ~/.claude/rwenv/envs.json
+cp ~/.claude/plugins/claude-plugins/rwenv/config/envs.example.json ~/.claude/rwenv/envs.json
 ```
 
 Edit `~/.claude/rwenv/envs.json` with your environment details:
