@@ -1,5 +1,5 @@
 ---
-name: gcloud-ops
+name: rwenv:gcloud-ops
 description: GCP operations subagent - always read-only for safety
 triggers:
   - gcloud operations

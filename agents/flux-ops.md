@@ -1,5 +1,5 @@
 ---
-name: flux-ops
+name: rwenv:flux-ops
 description: Flux CD operations for GitOps workflows, resource inspection, and deployment management
 triggers:
   - flux operations

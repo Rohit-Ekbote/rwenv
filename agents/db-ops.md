@@ -1,5 +1,5 @@
 ---
-name: db-ops
+name: rwenv:db-ops
 description: PostgreSQL database operations subagent - always read-only for safety
 triggers:
   - database query
