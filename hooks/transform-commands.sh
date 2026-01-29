@@ -126,13 +126,26 @@ KUBECONFIG_PATH=$(echo "$RWENV_CONFIG" | jq -r '.kubeconfigPath')
 K8S_CONTEXT=$(echo "$RWENV_CONFIG" | jq -r '.kubernetesContext')
 GCP_PROJECT=$(echo "$RWENV_CONFIG" | jq -r '.gcpProject // empty')
 READ_ONLY=$(echo "$RWENV_CONFIG" | jq -r '.readOnly')
+
+# Get execution mode
+USE_DEV_CONTAINER=$(get_use_dev_container)
 DEV_CONTAINER=$(get_dev_container)
 
-# Check if dev container is running
-if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${DEV_CONTAINER}$"; then
-    echo "ERROR: Dev container '$DEV_CONTAINER' is not running." >&2
-    echo "Start the container first, then retry the command." >&2
-    exit 2
+# Handle dev container mode
+if [[ "$USE_DEV_CONTAINER" == "true" ]]; then
+    # Check if dev container is running
+    if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${DEV_CONTAINER}$"; then
+        cat >&2 <<EOF
+Dev container '$DEV_CONTAINER' is not running.
+
+Options:
+1. Start the container and retry
+2. Switch to local mode (requires kubectl/helm/flux installed locally)
+
+To switch to local mode, run: /rwenv-local-mode
+EOF
+        exit 2
+    fi
 fi
 
 # Extract command arguments (everything after the base command)
@@ -208,25 +221,42 @@ EOF
 
 # Build the transformed command based on the base command
 build_transformed_command() {
-    # Note: Use -i only (not -it) since Claude Code runs non-interactively
-    local docker_prefix="docker exec -i $DEV_CONTAINER"
+    local cmd_prefix=""
+    local kubeconfig_flag=""
+
+    if [[ "$USE_DEV_CONTAINER" == "true" ]]; then
+        # Dev container mode: use docker exec with full kubeconfig path
+        cmd_prefix="docker exec -i $DEV_CONTAINER"
+        kubeconfig_flag="--kubeconfig=$KUBECONFIG_PATH"
+    fi
 
     case "$BASE_CMD" in
         kubectl)
             check_write_operation "$BASE_CMD" "$CMD_ARGS" "kubectl"
-            echo "$docker_prefix kubectl --kubeconfig=$KUBECONFIG_PATH --context=$K8S_CONTEXT $CMD_ARGS"
+            if [[ -n "$cmd_prefix" ]]; then
+                echo "$cmd_prefix kubectl $kubeconfig_flag --context=$K8S_CONTEXT $CMD_ARGS"
+            else
+                echo "kubectl --context=$K8S_CONTEXT $CMD_ARGS"
+            fi
             ;;
         helm)
             check_write_operation "$BASE_CMD" "$CMD_ARGS" "helm"
-            echo "$docker_prefix helm --kubeconfig=$KUBECONFIG_PATH --kube-context=$K8S_CONTEXT $CMD_ARGS"
+            if [[ -n "$cmd_prefix" ]]; then
+                echo "$cmd_prefix helm $kubeconfig_flag --kube-context=$K8S_CONTEXT $CMD_ARGS"
+            else
+                echo "helm --kube-context=$K8S_CONTEXT $CMD_ARGS"
+            fi
             ;;
         flux)
             check_write_operation "$BASE_CMD" "$CMD_ARGS" "flux"
-            echo "$docker_prefix flux --kubeconfig=$KUBECONFIG_PATH --context=$K8S_CONTEXT $CMD_ARGS"
+            if [[ -n "$cmd_prefix" ]]; then
+                echo "$cmd_prefix flux $kubeconfig_flag --context=$K8S_CONTEXT $CMD_ARGS"
+            else
+                echo "flux --context=$K8S_CONTEXT $CMD_ARGS"
+            fi
             ;;
         gcloud)
             check_gcloud_for_k3s
-            # gcloud is ALWAYS read-only
             if is_gcloud_write_operation "$CMD_ARGS"; then
                 cat >&2 <<EOF
 ERROR: gcloud write operations are blocked for safety.
@@ -234,21 +264,23 @@ ERROR: gcloud write operations are blocked for safety.
 Blocked command: gcloud $CMD_ARGS
 
 gcloud is always read-only regardless of rwenv settings.
-Blocked operations include: create, delete, start, stop, reset, resize, patch, update, rm, cp, mv
-
-Use the GCP Console or a dedicated deployment pipeline for write operations.
 EOF
                 exit 2
             fi
-            echo "$docker_prefix gcloud --project=$GCP_PROJECT $CMD_ARGS"
+            if [[ -n "$cmd_prefix" ]]; then
+                echo "$cmd_prefix gcloud --project=$GCP_PROJECT $CMD_ARGS"
+            else
+                echo "gcloud --project=$GCP_PROJECT $CMD_ARGS"
+            fi
             ;;
         vault)
-            # Vault commands pass through with container prefix
-            # Note: vault-specific safety could be added here
-            echo "$docker_prefix vault $CMD_ARGS"
+            if [[ -n "$cmd_prefix" ]]; then
+                echo "$cmd_prefix vault $CMD_ARGS"
+            else
+                echo "vault $CMD_ARGS"
+            fi
             ;;
         *)
-            # Shouldn't reach here due to earlier check, but pass through just in case
             echo "$ORIGINAL_CMD"
             ;;
     esac
