@@ -1,0 +1,24 @@
+{
+  "name": "rohit-claude-plugins",
+  "owner": {
+    "name": "Rohit Ekbote",
+    "url": "https://github.com/Rohit-Ekbote"
+  },
+  "metadata": {
+    "description": "Claude Code plugins for Kubernetes environment management",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "rwenv",
+      "description": "Multi-cluster Kubernetes environment management with safety guardrails",
+      "version": "0.1.0",
+      "source": "./rwenv",
+      "author": {
+        "name": "Rohit Ekbote"
+      },
+      "tags": ["kubernetes", "k8s", "gke", "k3s", "multi-cluster", "safety"],
+      "homepage": "https://github.com/Rohit-Ekbote/claude-plugins"
+    }
+  ]
+}
