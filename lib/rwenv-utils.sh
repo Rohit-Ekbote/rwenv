@@ -33,7 +33,8 @@ get_use_dev_container() {
         return
     fi
 
-    jq -r '.useDevContainer // true' "$envs_file"
+    # Note: Can't use // operator as it treats false as falsy
+    jq -r 'if .useDevContainer == null then true else .useDevContainer end' "$envs_file"
 }
 
 # Load envs.json content
