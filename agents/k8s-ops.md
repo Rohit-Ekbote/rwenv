@@ -113,19 +113,62 @@ When `readOnly: true` in rwenv config:
 
 3. **Warn before blocking** - show what would have been executed
 
-## Service URLs
+## Accessing Service Endpoints
 
-When the rwenv has service URLs configured, use them for:
-- Constructing API endpoints
-- Providing links to UIs
-- Referencing in commands that need service addresses
+Services are defined in `data/services-catalog.json` with connection info. The access method depends on whether the service is exposed externally.
 
-Example:
+### Check Service Info
+
+Look up service in catalog to determine access method:
+
+```bash
+# Service catalog entry example:
+{
+  "papi": {
+    "exposed": true,
+    "address": "https://papi.<rwenv-name>.runwhen.com",
+    "namespace": "backend-services",
+    "podSelector": "app=papi",
+    "internalPort": 8080
+  }
+}
 ```
-rwenv 'rdebug' services:
-  papi: https://papi.rdebug-61.local.runwhen.com
-  app: https://app.rdebug-61.local.runwhen.com
+
+### Exposed Services (exposed=true)
+
+**Services: papi, app, vault, gitea, agentfarm**
+
+Call directly from local machine - no kubectl needed:
+
+```bash
+# Replace <rwenv-name> with current rwenv (e.g., rdebug-61)
+curl https://papi.rdebug-61.runwhen.com/api/health
+curl https://agentfarm.rdebug-61.runwhen.com/api/v1/status
 ```
+
+### Internal Services (exposed=false)
+
+Must use kubectl exec into a pod of that service:
+
+```bash
+# 1. Find a running pod for the service
+docker exec <devContainer> kubectl \
+  --kubeconfig=<kubeconfigPath> \
+  --context=<kubernetesContext> \
+  get pods -n <namespace> -l <podSelector> -o name | head -1
+
+# 2. Exec into pod and curl localhost
+docker exec <devContainer> kubectl \
+  --kubeconfig=<kubeconfigPath> \
+  --context=<kubernetesContext> \
+  exec <pod> -n <namespace> -- curl -s http://localhost:<internalPort>/api/health
+```
+
+### DO NOT use port-forward for services
+
+Port-forward is reserved for database connections only. For services:
+- **Exposed**: curl directly from local machine
+- **Internal**: kubectl exec into service pod
 
 ## Error Handling
 
@@ -190,22 +233,43 @@ flux get kustomization <name> -n flux-system --watch
 
 ## Service Context Integration
 
-When a service name is mentioned without a namespace:
+When a service name is mentioned, look it up in `data/services-catalog.json`:
 
-1. **Look up in services catalog** (`data/services-catalog.json`)
-2. **Extract namespace** from catalog entry
-3. **Use namespace** in kubectl commands automatically
+1. **Get service info** - namespace, podSelector, exposed flag, address
+2. **For kubectl operations** - use namespace and podSelector
+3. **For API calls** - check exposed flag and use appropriate method
 
-Example:
+### Example: Get logs for papi
+
 ```
 User: "get logs for papi"
 
-1. Lookup: papi → namespace: runwhen-local
-2. Execute: kubectl logs -l app=papi -n runwhen-local
+1. Lookup: papi → namespace: backend-services, podSelector: app=papi
+2. Execute: kubectl logs -l app=papi -n backend-services
+```
+
+### Example: Call papi API endpoint
+
+```
+User: "check papi health endpoint"
+
+1. Lookup: papi → exposed: true, address: https://papi.<rwenv-name>.runwhen.com
+2. Resolve: rwenv is rdebug-61 → https://papi.rdebug-61.runwhen.com
+3. Execute: curl https://papi.rdebug-61.runwhen.com/api/health
+```
+
+### Example: Call internal service endpoint
+
+```
+User: "check core-backend health"
+
+1. Lookup: core-backend → exposed: false, namespace: backend-services, podSelector: app=core-backend, internalPort: 8000
+2. Find pod: kubectl get pods -n backend-services -l app=core-backend -o name | head -1
+3. Exec + curl: kubectl exec <pod> -n backend-services -- curl -s http://localhost:8000/health
 ```
 
 If service not in catalog:
 ```
 Service 'foo' not found in services catalog.
-Please specify the namespace, or run /services-mapping regenerate to rebuild the catalog.
+Available services: papi, app, vault, gitea, agentfarm
 ```

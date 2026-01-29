@@ -494,3 +494,61 @@ is_flux_repo_dirty() {
 
     (cd "$repo_path" && [[ -n "$(git status --porcelain)" ]])
 }
+
+# Get the plugin directory
+get_plugin_dir() {
+    # Try environment variable first, then default location
+    echo "${RWENV_PLUGIN_DIR:-$HOME/.claude/plugins/cache/Rohit-Ekbote-rwenv/rwenv}"
+}
+
+# Get service connection info from catalog
+# Usage: get_service_info <service_name>
+# Returns JSON with resolved address (rwenv-name replaced)
+get_service_info() {
+    local service_name="$1"
+    local rwenv_name
+    rwenv_name=$(get_current_rwenv) || {
+        echo "ERROR: No rwenv set for current directory" >&2
+        return 1
+    }
+
+    # Get services catalog file
+    local plugin_dir catalog_file
+    plugin_dir="$(get_plugin_dir)"
+    catalog_file="$plugin_dir/data/services-catalog.json"
+
+    if [[ ! -f "$catalog_file" ]]; then
+        echo "ERROR: Services catalog not found at $catalog_file" >&2
+        return 1
+    fi
+
+    # Get service entry
+    local service
+    service=$(jq -e --arg name "$service_name" '.services[$name]' "$catalog_file" 2>/dev/null) || {
+        echo "ERROR: Service '$service_name' not found in catalog" >&2
+        echo "Available services:" >&2
+        jq -r '.services | keys[]' "$catalog_file" >&2
+        return 1
+    }
+
+    # Replace <rwenv-name> placeholder in address
+    local address
+    address=$(echo "$service" | jq -r '.address // empty' | sed "s/<rwenv-name>/$rwenv_name/g")
+
+    # Build response with resolved address
+    echo "$service" | jq --arg addr "$address" '. + {resolvedAddress: $addr}'
+}
+
+# List all services in catalog
+list_services() {
+    local plugin_dir catalog_file
+    plugin_dir="$(get_plugin_dir)"
+    catalog_file="$plugin_dir/data/services-catalog.json"
+
+    if [[ ! -f "$catalog_file" ]]; then
+        echo "ERROR: Services catalog not found" >&2
+        return 1
+    fi
+
+    jq -r '.services | to_entries[] | "\(.key): \(.value.description) [exposed=\(.value.exposed)]"' "$catalog_file"
+}

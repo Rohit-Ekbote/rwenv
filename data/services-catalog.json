@@ -1,17 +1,45 @@
 {
   "version": "1.0",
-  "generatedFrom": {
-    "cluster": "placeholder",
-    "fluxRepo": "placeholder",
-    "generatedAt": "2026-01-24T00:00:00Z"
-  },
   "services": {
-    "_placeholder": {
-      "description": "Placeholder service - run /services-mapping regenerate to populate from cluster",
-      "namespace": "default",
-      "fluxPath": "clusters/example/apps/placeholder/",
-      "helmRelease": "placeholder",
-      "kustomization": "apps-placeholder"
+    "papi": {
+      "description": "Platform API service",
+      "namespace": "backend-services",
+      "exposed": true,
+      "address": "https://papi.<rwenv-name>.runwhen.com",
+      "podSelector": "app=papi",
+      "internalPort": 8080
+    },
+    "app": {
+      "description": "Web application",
+      "namespace": "frontend",
+      "exposed": true,
+      "address": "https://app.<rwenv-name>.runwhen.com",
+      "podSelector": "app=app",
+      "internalPort": 8080
+    },
+    "vault": {
+      "description": "HashiCorp Vault",
+      "namespace": "vault",
+      "exposed": true,
+      "address": "https://vault.<rwenv-name>.runwhen.com",
+      "podSelector": "app.kubernetes.io/name=vault",
+      "internalPort": 8200
+    },
+    "gitea": {
+      "description": "Gitea Git server",
+      "namespace": "gitea",
+      "exposed": true,
+      "address": "https://gitea.<rwenv-name>.runwhen.com",
+      "podSelector": "app=gitea",
+      "internalPort": 3000
+    },
+    "agentfarm": {
+      "description": "Agent Farm service",
+      "namespace": "backend-services",
+      "exposed": true,
+      "address": "https://agentfarm.<rwenv-name>.runwhen.com",
+      "podSelector": "app=agentfarm",
+      "internalPort": 8000
     }
   }
 }
