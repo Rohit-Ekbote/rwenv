@@ -70,20 +70,21 @@ External repos (flux repos, etc.) are not restricted.
 ```
 rwenv/
 ├── .claude-plugin/
-│   └── plugin.json        # Plugin metadata
+│   ├── plugin.json        # Plugin metadata
+│   └── marketplace.json   # Marketplace metadata
 ├── config/
 │   └── envs.example.json  # Example configuration
 ├── skills/
-│   ├── rwenv-list.md      # List environments
-│   ├── rwenv-cur.md       # Show current environment
-│   ├── rwenv-set.md       # Set environment
-│   ├── rwenv-add.md       # Add new environment
-│   └── services-mapping.md # Map services to K8s resources
+│   ├── rwenv-list/SKILL.md      # List environments
+│   ├── rwenv-cur/SKILL.md       # Show current environment
+│   ├── rwenv-set/SKILL.md       # Set environment
+│   ├── rwenv-add/SKILL.md       # Add new environment
+│   └── services-mapping/SKILL.md # Map services to K8s resources
 ├── hooks/
 │   ├── hooks.json         # Hook declarations
 │   ├── transform-commands.sh  # Command transformation
 │   └── validate-git.sh    # Git branch protection
-├── subagents/
+├── agents/
 │   ├── k8s-ops.md         # Kubernetes operations
 │   ├── db-ops.md          # Database queries
 │   ├── flux-ops.md        # Flux GitOps operations
