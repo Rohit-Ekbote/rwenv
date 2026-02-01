@@ -51,49 +51,14 @@ load_envs() {
     cat "$envs_file"
 }
 
-# Load env-consumers.json content
-load_consumers() {
-    local config_dir
-    config_dir="$(get_config_dir)"
-    local consumers_file="$config_dir/env-consumers.json"
-
-    if [[ ! -f "$consumers_file" ]]; then
-        echo '{}'
-        return 1
-    fi
-
-    cat "$consumers_file"
-}
-
 # Get current rwenv for a given directory (defaults to PWD)
 get_current_rwenv() {
     local dir="${1:-$PWD}"
-    local consumers
-    consumers="$(load_consumers)"
-
-    # Normalize path (resolve symlinks, remove trailing slash)
-    dir="$(cd "$dir" 2>/dev/null && pwd -P)" || dir="$1"
-
-    # Check for exact match first
-    local rwenv
-    rwenv="$(echo "$consumers" | jq -r --arg dir "$dir" '.[$dir] // empty')"
-
-    if [[ -n "$rwenv" ]]; then
-        echo "$rwenv"
+    local rwenv_file="$dir/.claude/rwenv"
+    if [[ -f "$rwenv_file" ]]; then
+        cat "$rwenv_file" | tr -d '[:space:]'
         return 0
     fi
-
-    # Check parent directories (for worktrees)
-    local parent="$dir"
-    while [[ "$parent" != "/" ]]; do
-        parent="$(dirname "$parent")"
-        rwenv="$(echo "$consumers" | jq -r --arg dir "$parent" '.[$dir] // empty')"
-        if [[ -n "$rwenv" ]]; then
-            echo "$rwenv"
-            return 0
-        fi
-    done
-
     return 1
 }
 
@@ -383,25 +348,25 @@ EOF
 
 # Set rwenv for a directory
 set_rwenv_for_dir() {
-    local dir="$1"
+    local dir="${1:-$PWD}"
     local rwenv_name="$2"
-    local config_dir
-    config_dir="$(get_config_dir)"
-    local consumers_file="$config_dir/env-consumers.json"
+    local rwenv_file="$dir/.claude/rwenv"
+    local gitignore="$dir/.gitignore"
 
-    # Ensure config dir exists
-    mkdir -p "$config_dir"
+    get_rwenv_by_name "$rwenv_name" >/dev/null || {
+        echo "ERROR: Unknown rwenv '$rwenv_name'" >&2
+        return 1
+    }
 
-    # Initialize empty consumers if file doesn't exist
-    if [[ ! -f "$consumers_file" ]]; then
-        echo '{}' > "$consumers_file"
+    mkdir -p "$dir/.claude"
+    echo "$rwenv_name" > "$rwenv_file"
+
+    # Auto-gitignore
+    if [[ -d "$dir/.git" ]] || git -C "$dir" rev-parse --git-dir >/dev/null 2>&1; then
+        if ! grep -qxF '.claude/rwenv' "$gitignore" 2>/dev/null; then
+            echo '.claude/rwenv' >> "$gitignore"
+        fi
     fi
-
-    # Update the mapping
-    local tmp_file
-    tmp_file="$(mktemp)"
-    jq --arg dir "$dir" --arg rwenv "$rwenv_name" '.[$dir] = $rwenv' "$consumers_file" > "$tmp_file"
-    mv "$tmp_file" "$consumers_file"
 }
 
 # Validate that dev container is running
