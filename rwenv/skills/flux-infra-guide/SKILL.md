@@ -324,3 +324,138 @@ Apps reference ${cluster_name} → resolved to "platform-cluster-01"
 | `${variable}` literal in pod env | Kustomization didn't substitute | cluster-vars ConfigMap exists? |
 | Old value still present | Pod not restarted after ConfigMap update | `kubectl rollout restart deployment/<name>` |
 | Value different than expected | Wrong cluster-vars source | Check Crossplane sync status |
+
+---
+
+## Observability
+
+Two separate data paths: infrastructure observability (Ops/SRE) and application metrics (product feature).
+
+### Stack Overview
+
+| Use Case | Purpose | Components | Who Consumes |
+|----------|---------|------------|--------------|
+| **Infrastructure** | Monitor infra (CPU, memory, logs) | Mimir, Loki, Grafana (shared) | SRE/Ops team |
+| **Application** | RunWhen platform features (alerting for end-users) | Cortex, Consul | End-users of RunWhen |
+
+### Component Map
+
+| Component | Purpose | Namespace | Storage |
+|-----------|---------|-----------|---------|
+| **Grafana Alloy** | Collection agent (metrics + logs) | `grafana-alloy` | N/A |
+| **Mimir** | Infrastructure metrics storage | `mimir` | GCS: `${project_id}-mimir` |
+| **Loki** | Infrastructure logs storage | `loki` | GCS: `${project_id}-loki` |
+| **Cortex** | Application metrics storage | `cortex` | GCS: `${cortex_bucket_name}` |
+| **Grafana** | Visualization (shared cluster) | `grafana` | Stateless |
+| **OpenCost** | Cost analysis | `opencost` | N/A |
+
+### Data Flow
+
+```
+INFRASTRUCTURE PATH                    APPLICATION PATH
+──────────────────                    ────────────────
+cAdvisor, kubelet, ServiceMonitors    Runner pods (:9090/metrics)
+         │                                    │
+         ▼                                    ▼
+    Grafana Alloy ◄────────────────► Grafana Alloy
+         │                                    │
+         ├──► Mimir (metrics)                 ▼
+         │                            cortex-tenant (adds tenant)
+         └──► Loki (logs)                     │
+                                              ▼
+                                         Cortex
+                                              │
+              ┌───────────────────────────────┘
+              ▼
+    Grafana (shared cluster)
+    grafana.shared.runwhen.com
+    Queries via X-Scope-OrgID header
+```
+
+### Multi-Tenancy
+
+Each project has isolated data via `X-Scope-OrgID` header:
+- `runwhen-dev-panda`
+- `runwhen-nonprod-test`
+- etc.
+
+Grafana datasources are configured per project with the appropriate tenant ID.
+
+### Log Queries (LogQL)
+
+**Via kubectl (quick):**
+```bash
+# Recent logs
+kubectl logs -n backend-services -l app=papi --tail=100
+
+# Follow logs
+kubectl logs -n backend-services -l app=papi -f
+
+# Previous container (after crash)
+kubectl logs -n backend-services -l app=papi --previous
+```
+
+**Via Loki (historical):**
+```logql
+# All logs for papi
+{namespace="backend-services", app="papi"}
+
+# Error logs only
+{namespace="backend-services", app="papi"} |= "ERROR"
+
+# Filter pattern
+{namespace="backend-services", app="papi"} |~ "connection refused|timeout"
+
+# Count errors over time
+count_over_time({namespace="backend-services", app="papi"} |= "ERROR" [5m])
+```
+
+**Access:** Grafana UI → Explore → Loki datasource
+
+### Metrics Queries (PromQL)
+
+**Via kubectl (quick):**
+```bash
+kubectl top pods -n backend-services
+kubectl top nodes
+```
+
+**Via Mimir (infrastructure):**
+```promql
+# CPU usage
+sum(rate(container_cpu_usage_seconds_total{namespace="backend-services", pod=~"papi.*"}[5m]))
+
+# Memory usage
+sum(container_memory_working_set_bytes{namespace="backend-services", pod=~"papi.*"})
+```
+
+**Access:** Grafana UI → Explore → Mimir datasource (select correct project)
+
+### Application Alerting Flow
+
+```
+Alert Rules (GCS bucket)
+         │
+         ▼
+   Cortex Ruler (evaluates rules)
+         │
+         ▼
+   Cortex Alertmanager (groups, deduplicates)
+         │
+         ▼
+   Alerts Service (alerts.backend-services.svc.cluster.local:8000)
+         │
+         ▼
+   End-user notifications (Slack, Email, PagerDuty)
+```
+
+### Key Config Files (in Flux repo)
+
+| File | What It Controls |
+|------|------------------|
+| `infrastructure/grafana-alloy/metrics-and-logs/config.alloy` | Scrape targets, log collection |
+| `infrastructure/grafana-alloy/metrics-and-logs/helm.yaml` | Alloy RBAC, DaemonSet settings |
+| `infrastructure/mimir/helm.yaml` | Metrics retention, GCS bucket |
+| `infrastructure/loki/helm.yaml` | Log retention, GCS bucket |
+| `infrastructure/cortex/helm-cortex.yaml` | App metrics, alerting config |
+| `infrastructure/opencost/helm.yaml` | Cost model, pricing rates |
