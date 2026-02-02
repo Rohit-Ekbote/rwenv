@@ -156,3 +156,83 @@ Many "config not applied" issues are actually failed HelmRelease upgrades or Kus
 | HelmRelease "upgrade retries exhausted" | Helm hook failed (migration) | `kubectl logs job/<release>-<hook> -n <namespace>` |
 | "path not found" | Wrong path in Kustomization | Verify path exists in Flux repo |
 | Config not updating | HelmRelease failed silently | `flux get helmrelease -A` to check all statuses |
+
+---
+
+## Secrets Map
+
+How secrets flow from Vault into services via CSI driver.
+
+### How to Use
+
+For secrets questions ("where does X get credentials", "why is secret missing"):
+1. Read `data/secrets-map.json` from this skill's directory
+2. Find the service's secret configuration
+3. Trace from Vault path → SecretProviderClass → Pod mount
+
+### Data Format (secrets-map.json)
+
+```json
+{
+  "secretProviderClasses": {
+    "vault-papi": {
+      "namespace": "backend-services",
+      "provider": "vault",
+      "vaultRole": "shared_secrets",
+      "vaultMountPath": "kubernetes-${cluster_name}",
+      "secrets": [
+        {
+          "vaultPath": "shared/data/secrets",
+          "vaultKey": "secrets.py",
+          "k8sSecretName": "papi-secrets",
+          "mountPath": "/secrets/secrets.py"
+        }
+      ],
+      "usedBy": ["papi", "celery-worker", "celery-beat"]
+    }
+  },
+  "metadata": {
+    "generatedFrom": "infra-flux-nonprod-test",
+    "generatedAt": "2026-02-02T10:00:00Z"
+  }
+}
+```
+
+### Secret Flow Diagram
+
+```
+Vault (source of truth)
+    │
+    ├── Path: shared/data/secrets
+    │
+    ▼
+SecretProviderClass (vault-papi)
+    │
+    ├── vaultRole: shared_secrets
+    ├── vaultMountPath: kubernetes-${cluster_name}
+    │
+    ▼
+CSI Volume Mount (in Pod spec)
+    │
+    ├── mountPath: /secrets/
+    │
+    ▼
+Pod reads secret file at /secrets/secrets.py
+```
+
+### Debugging Secrets
+
+**Check order when secrets are missing:**
+
+1. SecretProviderClass exists: `kubectl get secretproviderclass -n <namespace>`
+2. Vault auth working: `kubectl logs -n vault vault-0 | grep auth`
+3. CSI driver running: `kubectl get pods -n kube-system -l app=secrets-store-csi-driver`
+4. Pod events: `kubectl describe pod <pod> -n <namespace>` (look for mount errors)
+
+**Common failure patterns:**
+
+| Symptom | Likely cause | Check |
+|---------|--------------|-------|
+| "secret not found" on pod start | Vault role missing/wrong | Vault policy for `kubernetes-${cluster_name}` |
+| Pod stuck in ContainerCreating | CSI driver timeout | CSI driver pods, Vault connectivity |
+| Secret file empty | Vault path incorrect | `vault kv get shared/data/secrets` |
