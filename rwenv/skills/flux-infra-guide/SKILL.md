@@ -42,3 +42,52 @@ This skill uses lazy loading. Read data files only when needed:
 | Config ("what value does X have") | `data/configmaps.json` |
 
 Data files are located in this skill's `data/` directory.
+
+---
+
+## Service Map
+
+Quick lookup for where services run.
+
+### How to Use
+
+For service location questions ("where does X run", "what namespace is Y"):
+1. Read `data/services.json` from this skill's directory
+2. Find the service entry
+3. Use namespace/deployment info for kubectl commands
+
+### Data Format (services.json)
+
+```json
+{
+  "services": {
+    "papi": {
+      "namespace": "backend-services",
+      "deployment": "papi",
+      "fluxPath": "apps/backend-services/",
+      "kustomization": "runwhen-backend-services",
+      "description": "Platform API - core backend service"
+    }
+  },
+  "metadata": {
+    "generatedFrom": "infra-flux-nonprod-test",
+    "generatedAt": "2026-02-02T10:00:00Z"
+  }
+}
+```
+
+### Common Namespaces
+
+| Namespace | Purpose |
+|-----------|---------|
+| `backend-services` | Core platform services (PAPI, Celery, etc.) |
+| `flux-system` | Flux controllers and sources |
+| `linkerd` | Service mesh control plane |
+| `loki` | Log aggregation |
+| `mimir` | Metrics storage |
+| `vault` | Secrets management |
+| `cortex` | Application metrics |
+| `llm-gateway` | LLM proxy services |
+| `runner-system` | Runner infrastructure |
+| `corestate` | State management |
+| `gitservice` | Git integration |
