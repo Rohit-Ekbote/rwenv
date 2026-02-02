@@ -91,3 +91,68 @@ For service location questions ("where does X run", "what namespace is Y"):
 | `runner-system` | Runner infrastructure |
 | `corestate` | State management |
 | `gitservice` | Git integration |
+
+---
+
+## Flux Resources
+
+Inventory of Kustomizations and HelmReleases managed by Flux.
+
+### How to Use
+
+For Flux status questions ("why isn't X syncing", "what manages Y"):
+1. Read `data/flux-resources.json` from this skill's directory
+2. Find the Kustomization or HelmRelease
+3. Check status with `flux get kustomization <name>` or `flux get helmrelease <name>`
+
+### Data Format (flux-resources.json)
+
+```json
+{
+  "kustomizations": {
+    "runwhen-backend-services": {
+      "namespace": "flux-system",
+      "path": "./apps/backend-services",
+      "sourceRef": "flux-system",
+      "dependsOn": [],
+      "interval": "1m",
+      "prune": true,
+      "manages": ["papi", "celery-worker", "celery-beat", "activities", "alerts"]
+    }
+  },
+  "helmReleases": {
+    "loki": {
+      "namespace": "loki",
+      "chart": "loki",
+      "chartSource": "grafana",
+      "interval": "5m"
+    }
+  },
+  "metadata": {
+    "generatedFrom": "infra-flux-nonprod-test",
+    "generatedAt": "2026-02-02T10:00:00Z"
+  }
+}
+```
+
+### Debugging Flux Failures
+
+**IMPORTANT: Check Flux status FIRST before debugging config issues.**
+
+Many "config not applied" issues are actually failed HelmRelease upgrades or Kustomization reconciliation errors.
+
+**Check order when something isn't deploying:**
+
+1. GitRepository: `flux get source git flux-system -n flux-system`
+2. Kustomization: `flux get kustomization <name> -n flux-system`
+3. HelmRelease (if applicable): `flux get helmrelease <name> -n <namespace>`
+4. Events: `kubectl get events -n flux-system --sort-by='.lastTimestamp'`
+
+**Common failure patterns:**
+
+| Symptom | Likely cause | Check |
+|---------|--------------|-------|
+| Kustomization stuck "Reconciling" | Dependency not ready | Check `dependsOn` resources first |
+| HelmRelease "upgrade retries exhausted" | Helm hook failed (migration) | `kubectl logs job/<release>-<hook> -n <namespace>` |
+| "path not found" | Wrong path in Kustomization | Verify path exists in Flux repo |
+| Config not updating | HelmRelease failed silently | `flux get helmrelease -A` to check all statuses |
