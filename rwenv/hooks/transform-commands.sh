@@ -71,9 +71,16 @@ Use specific container names instead of bulk operations.
 EOF
             exit 2
         fi
+
+        # Auto-approve docker exec commands to the dev container
+        # These are safe operations (kubectl, psql, etc.) running in the managed container
+        if echo "$ORIGINAL_CMD" | grep -qE "docker exec.*$DEV_CONTAINER"; then
+            echo "$INPUT_JSON" | jq '.hookSpecificOutput = {permissionDecision: "allow"}'
+            exit 0
+        fi
     fi
 
-    # Allow other docker commands (like docker ps, docker logs, etc.)
+    # Allow other docker commands (like docker ps, docker logs, etc.) but don't auto-approve
     exit 0
 fi
 
@@ -293,6 +300,8 @@ EOF
 # Main execution
 TRANSFORMED_CMD=$(build_transformed_command)
 
-# Output JSON with the modified tool_input
-# The hook must return JSON with the modified tool_input to change the command
-echo "$INPUT_JSON" | jq --arg cmd "$TRANSFORMED_CMD" '.tool_input.command = $cmd'
+# Output JSON with the modified tool_input and auto-approve the command
+# Any command reaching this point has passed safety checks (write operations
+# in read-only mode already exit 2 above), so we can safely auto-approve
+echo "$INPUT_JSON" | jq --arg cmd "$TRANSFORMED_CMD" \
+    '.tool_input.command = $cmd | .hookSpecificOutput = {permissionDecision: "allow"}'
