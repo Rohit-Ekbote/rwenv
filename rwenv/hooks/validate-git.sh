@@ -341,17 +341,19 @@ EOF
         exit 2
     fi
 
-    # Check: git push --delete (could be deleting tags or branches)
+    # Check: git push --delete (only block deletion of protected branches)
     if is_git_subcommand "$git_cmd" "push" && echo "$git_cmd" | grep -qE "\-\-delete"; then
-        cat >&2 <<EOF
-ERROR: Cannot delete remote refs in current project.
+        if echo "$git_cmd" | grep -qE "\-\-delete[[:space:]]+($PROTECTED_BRANCHES)(\s|$)"; then
+            cat >&2 <<EOF
+ERROR: Cannot delete protected branch in current project.
 
 Command: $git_cmd
 Project: $git_root
 
-Deletion of remote branches/tags should be performed through the web interface or CI/CD.
+Deletion of protected branches should be performed through the web interface or CI/CD.
 EOF
-        exit 2
+            exit 2
+        fi
     fi
 
     # Check: git push origin :refs/tags/ (another way to delete remote tags)
