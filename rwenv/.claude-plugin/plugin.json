@@ -1,7 +1,7 @@
 {
   "name": "rwenv",
   "description": "Multi-cluster Kubernetes environment management with safety guardrails",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "author": {
     "name": "Rohit Ekbote"
   },
